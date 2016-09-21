@@ -19,14 +19,17 @@ class OracleOfBacon
   validates_presence_of :api_key
   validate :from_does_not_equal_to
 
-   def from_does_not_equal_to
-#    if @from == @to
-#      self.errors.add(:from, 'cannot be the same as To')
-#    end
+  def from_does_not_equal_to
+    if @from == @to
+      self.errors.add(:from, 'cannot be the same as To')
+    end
   end
 
   def initialize(api_key='')
     # your code here
+    @to = "Kevin Bacon"
+    @from = "Kevin Bacon"
+    @api_key = api_key
   end
 
   def find_connections
@@ -42,13 +45,17 @@ class OracleOfBacon
       # convert all of these into a generic OracleOfBacon::NetworkError,
       #  but keep the original error message
       # your code here
+      raise OracleOfBacon::NetworkError, e.message
     end
     # your code here: create the OracleOfBacon::Response object
+    response = Response.new(xml)
   end
 
   def make_uri_from_arguments
     # your code here: set the @uri attribute to properly-escaped URI
     # constructed from the @from, @to, @api_key arguments
+    oob_uri = "http://oracleofbacon.org/cgi-bin/xml?"
+    @uri = oob_uri + "p=" + @api_key + "&a=" + CGI.escape(@to) + "&b=" + CGI.escape(@from)
   end
       
   class Response
@@ -76,6 +83,17 @@ class OracleOfBacon
     def parse_error_response
      #Your code here.  Assign @type and @data
      # based on type attribute and body of the error element
+      @data = @doc.xpath('//error').text
+      puts @doc.xpath('//error')
+      if @doc.xpath('//error').text.include? "No query received"
+        @type = :badinput                #to fix***********
+      end
+      if @doc.xpath('//error').text.include? "no link"
+        @type = :unlinkable 
+      end
+      if @doc.xpath('//error').text.include? "unauthorized"
+        @type = :unauthorized
+      end
     end
 
     def parse_spellcheck_response
@@ -86,6 +104,25 @@ class OracleOfBacon
 
     def parse_graph_response
       #Your code here
+      graph_array = []
+      actor_array = []
+      movie_array = []
+      @doc.xpath('//actor').each do |actor|
+        actor_array << actor.inner_text
+      end
+      @doc.xpath('//movie').each do |movie|
+        movie_array << movie.inner_text
+      end
+      while (actor_array.empty?) == false do
+        graph_array << actor_array[0]
+        actor_array.shift
+        if movie_array.empty? == false
+          graph_array << movie_array[0]
+          movie_array.shift
+        end
+      end
+      @data = graph_array
+      @type = :graph
     end
 
     def parse_unknown_response
